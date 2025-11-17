@@ -12,9 +12,11 @@ pub enum AppError {
     #[error("Internal server error: {0}")]
     Internal(#[from] anyhow::Error),
 
+    #[allow(dead_code)]
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    #[allow(dead_code)]
     #[error("Not found: {0}")]
     NotFound(String),
 

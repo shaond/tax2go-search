@@ -36,7 +36,11 @@ async fn main() -> Result<()> {
     let state = AppState { index_manager };
 
     // Build router
-    let app = build_router(state);
+    let app = build_router(state, config.web_ui_enabled);
+
+    if config.web_ui_enabled {
+        info!("Web UI enabled at http://{}/ui", config.bind_addr);
+    }
 
     // Create TCP listener
     let listener = tokio::net::TcpListener::bind(&config.bind_addr)

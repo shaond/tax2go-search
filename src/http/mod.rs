@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod error;
 pub mod routes;
+pub mod webui;
 
 use axum::{
     routing::{delete, get, post, put},
@@ -17,7 +18,7 @@ use tracing::Level;
 use routes::AppState;
 
 /// Build the Axum router with all routes and middleware
-pub fn build_router(state: AppState) -> Router {
+pub fn build_router(state: AppState, web_ui_enabled: bool) -> Router {
     // API v1 routes - all require authentication
     let api_v1 = Router::new()
         .route("/documents", put(routes::index_document))
@@ -26,9 +27,16 @@ pub fn build_router(state: AppState) -> Router {
         .route("/stats", get(routes::get_stats));
 
     // Main router with health check and API routes
-    Router::new()
+    let mut router = Router::new()
         .route("/health", get(routes::health_check))
-        .nest("/v1", api_v1)
+        .nest("/v1", api_v1);
+
+    // Conditionally add web UI route
+    if web_ui_enabled {
+        router = router.route("/ui", get(webui::serve_ui));
+    }
+
+    router
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -55,7 +63,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let index_manager = Arc::new(IndexManager::new(temp_dir.path().to_path_buf()));
         let state = AppState { index_manager };
-        let app = build_router(state);
+        let app = build_router(state, false);
 
         let response = app
             .oneshot(
@@ -75,7 +83,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let index_manager = Arc::new(IndexManager::new(temp_dir.path().to_path_buf()));
         let state = AppState { index_manager };
-        let app = build_router(state);
+        let app = build_router(state, false);
 
         let response = app
             .oneshot(

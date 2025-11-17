@@ -17,7 +17,7 @@ fn create_test_app() -> (axum::Router, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let index_manager = Arc::new(IndexManager::new(temp_dir.path().to_path_buf()));
     let state = AppState { index_manager };
-    let app = build_router(state);
+    let app = build_router(state, false);
     (app, temp_dir)
 }
 

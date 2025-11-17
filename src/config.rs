@@ -13,6 +13,9 @@ pub struct Config {
 
     /// Log level for tracing
     pub log_level: String,
+
+    /// Enable web UI for testing (binds on localhost only)
+    pub web_ui_enabled: bool,
 }
 
 impl Config {
@@ -22,6 +25,7 @@ impl Config {
     /// - `BIND_ADDR`: Socket address (default: "127.0.0.1:8080")
     /// - `DATA_DIR`: Base directory for indexes (required)
     /// - `LOG_LEVEL`: Logging level (default: "info")
+    /// - `WEB_UI_ENABLED`: Enable web UI (default: "false")
     pub fn from_env() -> Result<Self> {
         // Load .env file if it exists (development only)
         let _ = dotenvy::dotenv();
@@ -38,10 +42,16 @@ impl Config {
         let log_level = std::env::var("LOG_LEVEL")
             .unwrap_or_else(|_| "info".to_string());
 
+        let web_ui_enabled = std::env::var("WEB_UI_ENABLED")
+            .unwrap_or_else(|_| "false".to_string())
+            .to_lowercase()
+            == "true";
+
         Ok(Config {
             bind_addr,
             data_dir,
             log_level,
+            web_ui_enabled,
         })
     }
 
@@ -73,6 +83,7 @@ mod tests {
             bind_addr: "127.0.0.1:8080".parse().unwrap(),
             data_dir: temp_dir.path().to_path_buf(),
             log_level: "info".to_string(),
+            web_ui_enabled: false,
         };
 
         assert!(config.validate().is_ok());

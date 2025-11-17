@@ -104,6 +104,7 @@ pub fn doc_from_input(schema: &Schema, input: &IndexDocumentInput) -> Result<Tan
 }
 
 /// Extract document ID from a Tantivy document
+#[allow(dead_code)]
 pub fn extract_doc_id(schema: &Schema, doc: &TantivyDocument) -> Option<String> {
     let id_field = schema.get_field(FieldNames::ID).ok()?;
     doc.get_first(id_field)

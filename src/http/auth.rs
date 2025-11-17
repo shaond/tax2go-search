@@ -17,6 +17,7 @@ pub struct CurrentUser {
 }
 
 impl CurrentUser {
+    #[allow(dead_code)]
     pub fn new(user_id: Uuid) -> Self {
         CurrentUser { user_id }
     }
@@ -81,7 +82,7 @@ mod tests {
     #[tokio::test]
     async fn test_current_user_extractor() {
         let user_id = Uuid::new_v4();
-        let mut req = Request::builder()
+        let req = Request::builder()
             .header("X-User-Id", user_id.to_string())
             .body(Body::empty())
             .unwrap();
@@ -97,7 +98,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_current_user_missing_header() {
-        let mut req = Request::builder()
+        let req = Request::builder()
             .body(Body::empty())
             .unwrap();
 
@@ -110,7 +111,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_current_user_invalid_uuid() {
-        let mut req = Request::builder()
+        let req = Request::builder()
             .header("X-User-Id", "not-a-uuid")
             .body(Body::empty())
             .unwrap();

@@ -276,6 +276,19 @@ const HTML_CONTENT: &str = r#"<!DOCTYPE html>
                     <button type="submit">Search</button>
                 </form>
 
+                <h2 style="margin-top: 30px;">Browse Index</h2>
+                <form id="browseForm">
+                    <div class="form-group">
+                        <label for="browseUserId">User ID (UUID)</label>
+                        <input type="text" id="browseUserId" placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="browseLimit">Documents to Show</label>
+                        <input type="number" id="browseLimit" value="50" min="1" max="1000">
+                    </div>
+                    <button type="submit" style="background: #059669;">Browse All Documents</button>
+                </form>
+
                 <h2 style="margin-top: 30px;">Delete Document</h2>
                 <form id="deleteForm">
                     <div class="form-group">
@@ -387,7 +400,40 @@ const HTML_CONTENT: &str = r#"<!DOCTYPE html>
                 }
 
                 const result = await response.json();
-                displayResults(result);
+                displaySearchResults(result);
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Browse Documents
+        document.getElementById('browseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const userId = document.getElementById('browseUserId').value.trim();
+            const limit = parseInt(document.getElementById('browseLimit').value);
+
+            try {
+                const response = await fetch(`${API_BASE}/v1/browse`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-Id': userId
+                    },
+                    body: JSON.stringify({
+                        limit,
+                        offset: 0
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Browse failed');
+                }
+
+                const result = await response.json();
+                displayBrowseResults(result);
+                showMessage(`Loaded ${result.total} document(s) in ${result.took_ms}ms`, 'success');
             } catch (error) {
                 showMessage(`Error: ${error.message}`, 'error');
             }
@@ -426,7 +472,7 @@ const HTML_CONTENT: &str = r#"<!DOCTYPE html>
             }
         });
 
-        function displayResults(result) {
+        function displaySearchResults(result) {
             const resultsEl = document.getElementById('results');
 
             if (!result.results || result.results.length === 0) {
@@ -437,10 +483,32 @@ const HTML_CONTENT: &str = r#"<!DOCTYPE html>
             resultsEl.innerHTML = result.results.map(doc => `
                 <div class="result-item">
                     <div class="result-title">${escapeHtml(doc.title)}</div>
-                    <div class="result-body">${escapeHtml(doc.body.substring(0, 200))}${doc.body.length > 200 ? '...' : ''}</div>
+                    <div class="result-body" style="white-space: pre-wrap;">${escapeHtml(doc.body)}</div>
                     <div class="result-meta">
                         <span class="result-score">Score: ${doc.score.toFixed(2)}</span>
                         <span>ID: ${escapeHtml(doc.id)}</span>
+                        ${doc.created_at ? `<span>Created: ${new Date(doc.created_at).toLocaleString()}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function displayBrowseResults(result) {
+            const resultsEl = document.getElementById('results');
+
+            if (!result.documents || result.documents.length === 0) {
+                resultsEl.innerHTML = '<div class="no-results">No documents found in this index.</div>';
+                return;
+            }
+
+            resultsEl.innerHTML = result.documents.map(doc => `
+                <div class="result-item">
+                    <div class="result-title">${escapeHtml(doc.title)}</div>
+                    <div class="result-body" style="white-space: pre-wrap;">${escapeHtml(doc.body)}</div>
+                    <div class="result-meta">
+                        <span>ID: ${escapeHtml(doc.id)}</span>
+                        ${doc.created_at ? `<span>Created: ${new Date(doc.created_at).toLocaleString()}</span>` : ''}
+                        ${doc.tags && doc.tags.length > 0 ? `<span>Tags: ${doc.tags.map(t => escapeHtml(t)).join(', ')}</span>` : ''}
                     </div>
                 </div>
             `).join('');
@@ -455,6 +523,7 @@ const HTML_CONTENT: &str = r#"<!DOCTYPE html>
         // Sync user ID fields
         document.getElementById('userId').addEventListener('input', (e) => {
             document.getElementById('searchUserId').value = e.target.value;
+            document.getElementById('browseUserId').value = e.target.value;
             document.getElementById('deleteUserId').value = e.target.value;
         });
     </script>

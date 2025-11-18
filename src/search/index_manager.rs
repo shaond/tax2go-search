@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use super::models::{
     DeleteDocumentResponse, IndexDocumentInput, IndexDocumentResponse, SearchQuery, SearchResponse,
-    SearchResult,
+    SearchResult, BrowseDocumentsQuery, BrowseDocumentsResponse, DocumentDetail,
 };
 use super::schema::{build_schema, doc_from_input, FieldNames};
 
@@ -261,7 +261,7 @@ impl IndexManager {
             results.push(SearchResult {
                 id,
                 title,
-                body: body.chars().take(500).collect(), // Truncate body to 500 chars
+                body, // Complete body, not truncated
                 score: _score,
                 created_at,
                 snippet: None, // TODO: Implement snippet generation
@@ -300,6 +300,103 @@ impl IndexManager {
         Ok(UserIndexStats {
             user_id,
             num_documents: num_docs,
+        })
+    }
+
+    /// Browse/list all documents for a user
+    ///
+    /// Returns complete documents without requiring a search query.
+    pub async fn browse_documents(
+        &self,
+        user_id: Uuid,
+        query: BrowseDocumentsQuery,
+    ) -> Result<BrowseDocumentsResponse> {
+        let start = Instant::now();
+
+        let handle = self.get_or_create_index(user_id).await?;
+
+        // Reload the reader to see latest commits
+        handle.reader.reload()?;
+        let searcher = handle.reader.searcher();
+
+        // Get field handles
+        let id_field = handle.schema.get_field(FieldNames::ID).context("ID field not found")?;
+        let title_field = handle.schema.get_field(FieldNames::TITLE).context("Title field not found")?;
+        let body_field = handle.schema.get_field(FieldNames::BODY).context("Body field not found")?;
+        let created_at_field = handle.schema.get_field(FieldNames::CREATED_AT).ok();
+        let tags_field = handle.schema.get_field(FieldNames::TAGS).ok();
+
+        // Use a match-all query to get all documents
+        use tantivy::query::AllQuery;
+        let all_query = AllQuery;
+
+        // Get all documents, limited by the query parameters
+        let limit = query.limit.min(1000); // Cap at 1000 documents
+        let offset = query.offset;
+        let top_docs = searcher.search(&all_query, &TopDocs::with_limit(limit + offset))?;
+
+        // Convert results
+        let mut documents = Vec::new();
+
+        for (_score, doc_address) in top_docs.into_iter().skip(offset).take(limit) {
+            let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
+
+            let id = retrieved_doc
+                .get_first(id_field)
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            let title = retrieved_doc
+                .get_first(title_field)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            let body = retrieved_doc
+                .get_first(body_field)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            let created_at = created_at_field
+                .and_then(|f| retrieved_doc.get_first(f))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            // Extract tags from the document
+            let tags = if let Some(tags_f) = tags_field {
+                retrieved_doc
+                    .get_all(tags_f)
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+            documents.push(DocumentDetail {
+                id,
+                title,
+                body, // Full body, not truncated
+                created_at,
+                tags,
+            });
+        }
+
+        let took_ms = start.elapsed().as_millis() as u64;
+        let total = documents.len();
+
+        debug!(
+            user_id = %user_id,
+            documents = total,
+            took_ms = took_ms,
+            "Browse completed"
+        );
+
+        Ok(BrowseDocumentsResponse {
+            documents,
+            total,
+            took_ms,
         })
     }
 }

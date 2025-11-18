@@ -152,3 +152,52 @@ pub struct HealthResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
+
+/// Browse/list documents request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BrowseDocumentsQuery {
+    /// Maximum number of results to return
+    #[serde(default = "default_browse_limit")]
+    pub limit: usize,
+
+    /// Offset for pagination
+    #[serde(default)]
+    pub offset: usize,
+}
+
+fn default_browse_limit() -> usize {
+    50
+}
+
+/// Document details for browse response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DocumentDetail {
+    /// Document ID
+    pub id: String,
+
+    /// Document title
+    pub title: String,
+
+    /// Complete document body
+    pub body: String,
+
+    /// Creation timestamp
+    pub created_at: Option<String>,
+
+    /// Tags
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+/// Browse response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BrowseDocumentsResponse {
+    /// Documents
+    pub documents: Vec<DocumentDetail>,
+
+    /// Total number of documents returned
+    pub total: usize,
+
+    /// Time taken in milliseconds
+    pub took_ms: u64,
+}

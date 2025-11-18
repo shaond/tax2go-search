@@ -9,6 +9,7 @@ use tracing::{info, error};
 
 use crate::search::{
     DeleteDocumentInput, HealthResponse, IndexDocumentInput, IndexManager, SearchQuery,
+    BrowseDocumentsQuery,
 };
 
 use super::auth::CurrentUser;
@@ -175,6 +176,43 @@ pub async fn get_stats(
         user_id: stats.user_id.to_string(),
         num_documents: stats.num_documents,
     };
+
+    Ok(Json(response))
+}
+
+/// Browse/list all documents for a user
+///
+/// GET /v1/browse
+///
+/// Returns all documents in the user's index with optional pagination.
+pub async fn browse_documents(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+    Json(query): Json<BrowseDocumentsQuery>,
+) -> AppResult<impl IntoResponse> {
+    info!(
+        user_id = %current_user.user_id,
+        limit = query.limit,
+        offset = query.offset,
+        "Browsing documents"
+    );
+
+    if query.limit == 0 {
+        return Err(AppError::Validation("Limit must be greater than 0".to_string()));
+    }
+
+    if query.limit > 1000 {
+        return Err(AppError::Validation("Limit cannot exceed 1000".to_string()));
+    }
+
+    let response = state
+        .index_manager
+        .browse_documents(current_user.user_id, query)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Browse failed");
+            AppError::Internal(e)
+        })?;
 
     Ok(Json(response))
 }

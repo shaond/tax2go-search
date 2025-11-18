@@ -24,6 +24,7 @@ pub fn build_router(state: AppState, web_ui_enabled: bool) -> Router {
         .route("/documents", put(routes::index_document))
         .route("/documents", delete(routes::delete_document))
         .route("/search", post(routes::search_documents))
+        .route("/browse", post(routes::browse_documents))
         .route("/stats", get(routes::get_stats));
 
     // Main router with health check and API routes
